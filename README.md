@@ -45,7 +45,11 @@ npm install
 3. Set up environment variables:
 Create a `.env.local` file in the frontend directory with:
 ```
-NEXT_PUBLIC_API_URL=your-api-url
+# Required API Keys
+NEXT_PUBLIC_MCP_API_KEY=your_mcp_api_key_here
+
+# API URLs (default for local development)
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
 ```
 
 4. Start the development server:
@@ -54,6 +58,19 @@ npm run dev
 ```
 
 The application will be available at `http://localhost:3000`
+
+## Environment Variables
+
+The following environment variables are required for the application to function properly:
+
+- `NEXT_PUBLIC_MCP_API_KEY`: Your MCP (Smithery) API key for accessing Firecrawl services
+- `NEXT_PUBLIC_API_URL`: The base URL for API endpoints (defaults to http://localhost:3000/api)
+
+To obtain an MCP API key:
+1. Sign up at https://smithery.ai
+2. Navigate to your account settings
+3. Generate a new API key with Firecrawl permissions
+4. Add the key to your `.env.local` file
 
 ## Tech Stack
 
