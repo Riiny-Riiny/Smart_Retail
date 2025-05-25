@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = []
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  totalSpent   Float
+  orderCount   Int
+  lastPurchase DateTime
+  segment      Segment
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+}
+
+model Order {
+  id         String      @id @default(uuid())
+  customerId String
+  total      Float
+  status     Status
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  items      OrderItem[]
+}
+
+model Product {
+  id            String         @id @default(uuid())
+  name          String
+  description   String?
+  sku           String        @unique
+  price         Float
+  stock         Int
+  category      String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  orderItems    OrderItem[]
+  priceHistory  PriceHistory[]
+  priceAlerts   PriceAlert[]
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  order     Order    @relation(fields: [orderId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Competitor {
+  id            String         @id @default(uuid())
+  name          String
+  website       String
+  active        Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  priceHistory  PriceHistory[]
+  priceAlerts   PriceAlert[]
+}
+
+model PriceHistory {
+  id            String      @id @default(uuid())
+  productId     String
+  competitorId  String
+  price         Float
+  url           String
+  timestamp     DateTime    @default(now())
+  product       Product     @relation(fields: [productId], references: [id])
+  competitor    Competitor  @relation(fields: [competitorId], references: [id])
+
+  @@index([productId])
+  @@index([competitorId])
+}
+
+model PriceAlert {
+  id              String      @id @default(uuid())
+  productId       String
+  competitorId    String
+  oldPrice        Float
+  newPrice        Float
+  percentageChange Float
+  significance    AlertSignificance
+  reason          String
+  timestamp       DateTime    @default(now())
+  product         Product     @relation(fields: [productId], references: [id])
+  competitor      Competitor  @relation(fields: [competitorId], references: [id])
+
+  @@index([productId])
+  @@index([competitorId])
+}
+
+model User {
+  id               String           @id @default(uuid())
+  email            String          @unique
+  name             String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  alertPreferences AlertPreferences?
+}
+
+model AlertPreferences {
+  id              String           @id @default(uuid())
+  userId          String          @unique
+  minSignificance AlertSignificance
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  user            User            @relation(fields: [userId], references: [id])
+}
+
+enum Segment {
+  VIP
+  Regular
+  New
+}
+
+enum Status {
+  Pending
+  Processing
+  Completed
+  Cancelled
+}
+
+enum AlertSignificance {
+  HIGH
+  MEDIUM
+  LOW
+}

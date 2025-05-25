@@ -1,6 +1,7 @@
 'use client';
 
 import { BellIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { ThemeSwitcher } from '../ThemeSwitcher';
 
 export function Header() {
   return (
@@ -11,6 +12,7 @@ export function Header() {
         </div>
         
         <div className="flex items-center space-x-4">
+          <ThemeSwitcher />
           <button className="p-2 text-gray-500 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-300">
             <BellIcon className="h-6 w-6" />
           </button>
