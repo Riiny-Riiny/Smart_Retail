@@ -5,7 +5,7 @@ import { ThemeSwitcher } from '../ThemeSwitcher';
 
 export function Header() {
   return (
-    <header className="h-16 fixed top-0 right-0 left-64 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-10">
+    <header className="h-16 fixed top-0 right-0 lg:left-64 left-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-10">
       <div className="h-full px-4 flex items-center justify-between">
         <div className="flex items-center">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Dashboard</h2>

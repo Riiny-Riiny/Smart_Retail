@@ -1,72 +1,217 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-model Customer {
-  id           String   @id @default(uuid())
-  name         String
-  email        String   @unique
-  totalSpent   Float
-  orderCount   Int
-  lastPurchase DateTime
-  segment      Segment
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  orders       Order[]
+// NextAuth.js required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
 }
 
-model Order {
-  id         String      @id @default(uuid())
-  customerId String
-  total      Float
-  status     Status
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  customer   Customer    @relation(fields: [customerId], references: [id])
-  items      OrderItem[]
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Core business models
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          String    @default("USER")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  accounts      Account[]
+  sessions      Session[]
+  organizations OrganizationMember[]
+  createdOrgs   Organization[]       @relation("OrganizationCreator")
+}
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  domain      String?
+  logo        String?
+  plan        String   @default("FREE")
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+
+  // Relations
+  createdBy   User                 @relation("OrganizationCreator", fields: [createdById], references: [id])
+  members     OrganizationMember[]
+  products    Product[]
+  competitors Competitor[]
+  alerts      Alert[]
+  customers   Customer[]
+  subscription Subscription?
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  role           String   @default("MEMBER")
+  status         String   @default("ACTIVE")
+  invitedAt      DateTime @default(now())
+  joinedAt       DateTime?
+  invitedBy      String?
+
+  // Relations
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+model Subscription {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  plan           String
+  status         String   @default("ACTIVE")
+  stripeCustomerId String? @unique
+  stripeSubscriptionId String? @unique
+  stripePriceId  String?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 }
 
 model Product {
-  id          String      @id @default(uuid())
-  name        String
-  description String?
-  price       Float
-  stock       Int
-  category    String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  orderItems  OrderItem[]
+  id             String   @id @default(cuid())
+  name           String
+  sku            String
+  price          Float
+  category       String
+  description    String?
+  stock          Int      @default(0)
+  imageUrl       String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  priceHistory PriceHistory[]
+  alerts       Alert[]
+
+  @@unique([sku, organizationId])
 }
 
-model OrderItem {
-  id        String   @id @default(uuid())
-  orderId   String
-  productId String
-  quantity  Int
-  price     Float
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  order     Order    @relation(fields: [orderId], references: [id])
-  product   Product  @relation(fields: [productId], references: [id])
+model Competitor {
+  id             String   @id @default(cuid())
+  name           String
+  website        String?
+  description    String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  @@index([orderId])
-  @@index([productId])
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  priceHistory PriceHistory[]
 }
 
-enum Segment {
-  VIP
-  Regular
-  New
+model PriceHistory {
+  id           String   @id @default(cuid())
+  productId    String
+  competitorId String?
+  price        Float
+  currency     String   @default("USD")
+  source       String?
+  scrapedAt    DateTime @default(now())
+
+  // Relations
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  competitor Competitor? @relation(fields: [competitorId], references: [id], onDelete: SetNull)
 }
 
-enum Status {
-  Pending
-  Processing
-  Completed
-  Cancelled
+model Alert {
+  id             String   @id @default(cuid())
+  title          String
+  message        String
+  type           String
+  priority       String   @default("MEDIUM")
+  status         String   @default("UNREAD")
+  productId      String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  readAt         DateTime?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  product      Product?     @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
+
+model Customer {
+  id             String   @id @default(cuid())
+  name           String
+  email          String
+  phone          String?
+  address        String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([email, organizationId])
+}
+
+// Note: Using String types instead of enums for SQLite compatibility
+// Valid values:
+// UserRole: "USER", "ADMIN", "SUPER_ADMIN"
+// MemberRole: "OWNER", "ADMIN", "MEMBER", "VIEWER"
+// MemberStatus: "PENDING", "ACTIVE", "SUSPENDED"
+// OrganizationStatus: "ACTIVE", "SUSPENDED", "DELETED"
+// SubscriptionPlan: "FREE", "STARTER", "PROFESSIONAL", "ENTERPRISE"
+// SubscriptionStatus: "ACTIVE", "CANCELED", "PAST_DUE", "UNPAID", "INCOMPLETE"
+// AlertType: "PRICE_CHANGE", "STOCK_LOW", "COMPETITOR_NEW", "SYSTEM"
+// AlertPriority: "LOW", "MEDIUM", "HIGH", "CRITICAL"
+// AlertStatus: "UNREAD", "READ", "ARCHIVED"

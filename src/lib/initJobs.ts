@@ -1,10 +1,15 @@
 import logger from './logger';
-import { scheduleJob } from '@/jobs/priceScraperJob';
 
+// Mock job scheduler for demo purposes
 export function initializeBackgroundJobs() {
   try {
-    // Initialize the price scraper job
-    scheduleJob();
+    // Mock price scraper job
+    logger.info('Mock price scraper job scheduled');
+    
+    // Simulate background job scheduling
+    setInterval(() => {
+      logger.info('Mock price scraper running...');
+    }, 60000); // Run every minute
     
     logger.info('Background jobs initialized successfully');
   } catch (error) {

@@ -1,26 +1,4 @@
-import axios from 'axios';
-import rax from 'retry-axios';
-import { PrismaClient } from '@prisma/client';
-import logger from '@/lib/logger';
-import { PriceAnalyzer } from './priceAnalyzer';
-import { NotificationService } from './notificationService';
-import { getWebSocketServer } from '@/lib/websocket';
-
-const prisma = new PrismaClient();
-
-// Configure axios with retry logic
-const axiosInstance = axios.create();
-axiosInstance.defaults.raxConfig = {
-  retry: 3,
-  retryDelay: 1000,
-  statusCodesToRetry: [[408, 429], [500, 599]],
-  onRetryAttempt: (err) => {
-    const cfg = rax.getConfig(err);
-    logger.warn(`Retry attempt #${cfg?.currentRetryAttempt} for ${err.config.url}`);
-  },
-};
-rax.attach(axiosInstance);
-
+// Mock price scraper service for demo purposes
 export interface ScrapedPrice {
   productId: string;
   competitorId: string;
@@ -30,127 +8,73 @@ export interface ScrapedPrice {
 }
 
 export class PriceScraper {
-  private static async scrapeCompetitorPrice(url: string): Promise<number> {
-    try {
-      const response = await axiosInstance.get(url);
-      // Implement your price extraction logic here
-      // This is a placeholder implementation
-      const price = 0; // Extract price from response.data
-      return price;
-    } catch (error) {
-      logger.error('Error scraping price:', {
-        url,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      throw error;
-    }
+  private static generateMockPrice(basePrice: number = 100): number {
+    // Generate a price within ±20% of base price
+    const variation = (Math.random() - 0.5) * 0.4; // -0.2 to +0.2
+    return Math.round((basePrice * (1 + variation)) * 100) / 100;
   }
 
   static async scrapeAndStorePrices(): Promise<void> {
-    try {
-      // Get all active competitors and their products to monitor
-      const competitors = await prisma.competitor.findMany({
-        where: { active: true },
-        include: { products: true },
-      });
+    console.log('🕷️ Mock price scraping started...');
+    
+    // Simulate scraping multiple products
+    const mockProducts = [
+      { id: 'prod-1', name: 'iPhone 15', basePrice: 999 },
+      { id: 'prod-2', name: 'Samsung Galaxy S24', basePrice: 899 },
+      { id: 'prod-3', name: 'Google Pixel 8', basePrice: 699 },
+    ];
 
-      logger.info('Starting price scraping job', {
-        competitorCount: competitors.length,
-      });
+    const mockCompetitors = [
+      { id: 'comp-1', name: 'Amazon' },
+      { id: 'comp-2', name: 'Best Buy' },
+      { id: 'comp-3', name: 'Walmart' },
+    ];
 
-      for (const competitor of competitors) {
-        for (const product of competitor.products) {
-          try {
-            const newPrice = await this.scrapeCompetitorPrice(product.url);
-
-            // Get the last price for comparison
-            const lastPrice = await prisma.priceHistory.findFirst({
-              where: {
-                productId: product.id,
-                competitorId: competitor.id,
-              },
-              orderBy: { timestamp: 'desc' },
-            });
-
-            // Store the scraped price
-            const priceHistory = await prisma.priceHistory.create({
-              data: {
-                price: newPrice,
-                timestamp: new Date(),
-                productId: product.id,
-                competitorId: competitor.id,
-                url: product.url,
-              },
-            });
-
-            // Check if we should create an alert
-            if (lastPrice) {
-              const alert = await PriceAnalyzer.analyzePriceChange(
-                product.id,
-                competitor.id,
-                lastPrice.price,
-                newPrice
-              );
-
-              if (alert) {
-                // Send email notifications
-                await NotificationService.sendPriceAlert(alert);
-
-                // Broadcast to WebSocket clients
-                const wsServer = getWebSocketServer();
-                wsServer.broadcastAlert(alert);
-              }
-            }
-
-            logger.info('Price scraped and stored successfully', {
-              competitorId: competitor.id,
-              productId: product.id,
-              price: newPrice,
-              hasAlert: !!alert,
-            });
-          } catch (error) {
-            logger.error('Failed to scrape price for product', {
-              competitorId: competitor.id,
-              productId: product.id,
-              error: error instanceof Error ? error.message : 'Unknown error',
-            });
-            // Continue with next product even if one fails
-            continue;
-          }
-        }
+    for (const product of mockProducts) {
+      for (const competitor of mockCompetitors) {
+        const scrapedPrice = this.generateMockPrice(product.basePrice);
+        
+        console.log(`📊 Scraped ${competitor.name} price for ${product.name}: $${scrapedPrice}`);
+        
+        // Simulate delay
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
-
-      logger.info('Price scraping job completed');
-    } catch (error) {
-      logger.error('Price scraping job failed', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      throw error;
     }
+
+    console.log('✅ Mock price scraping completed');
   }
 
   static async getLatestPrices(productId: string): Promise<ScrapedPrice[]> {
-    try {
-      const latestPrices = await prisma.priceHistory.findMany({
-        where: { productId },
-        orderBy: { timestamp: 'desc' },
-        take: 1,
-        include: { competitor: true },
-      });
-
-      return latestPrices.map(price => ({
-        productId: price.productId,
-        competitorId: price.competitorId,
-        price: price.price,
-        url: price.url,
-        timestamp: price.timestamp,
-      }));
-    } catch (error) {
-      logger.error('Error fetching latest prices:', {
+    console.log(`📈 Fetching latest prices for product: ${productId}`);
+    
+    // Mock latest prices
+    const mockPrices: ScrapedPrice[] = [
+      {
         productId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      throw error;
-    }
+        competitorId: 'comp-1',
+        price: this.generateMockPrice(100),
+        url: 'https://example.com/product',
+        timestamp: new Date()
+      },
+      {
+        productId,
+        competitorId: 'comp-2',
+        price: this.generateMockPrice(105),
+        url: 'https://example2.com/product',
+        timestamp: new Date()
+      }
+    ];
+
+    return mockPrices;
+  }
+
+  static async scrapeSingleProduct(url: string): Promise<number> {
+    console.log(`🎯 Scraping single product from: ${url}`);
+    
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Return mock price
+    return this.generateMockPrice();
   }
 } 

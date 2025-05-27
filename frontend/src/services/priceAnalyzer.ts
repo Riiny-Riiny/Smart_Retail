@@ -1,6 +1,4 @@
-import prisma from '@/lib/prisma';
-import logger from '@/lib/logger';
-
+// Mock price analyzer service for demo purposes
 export interface PriceAlert {
   id: string;
   productId: string;
@@ -14,49 +12,17 @@ export interface PriceAlert {
 }
 
 export class PriceAnalyzer {
-  // Z-score threshold for significant changes
   private static readonly SIGNIFICANCE_THRESHOLDS = {
-    HIGH: 2.5,    // 99% confidence
-    MEDIUM: 1.96, // 95% confidence
-    LOW: 1.645    // 90% confidence
+    HIGH: 20,    // 20% change
+    MEDIUM: 10,  // 10% change
+    LOW: 5       // 5% change
   };
 
-  private static calculateZScore(value: number, mean: number, stdDev: number): number {
-    return Math.abs((value - mean) / (stdDev || 1));
-  }
-
-  private static calculateSignificance(zScore: number): 'HIGH' | 'MEDIUM' | 'LOW' {
-    if (zScore >= this.SIGNIFICANCE_THRESHOLDS.HIGH) return 'HIGH';
-    if (zScore >= this.SIGNIFICANCE_THRESHOLDS.MEDIUM) return 'MEDIUM';
-    if (zScore >= this.SIGNIFICANCE_THRESHOLDS.LOW) return 'LOW';
+  private static calculateSignificance(percentageChange: number): 'HIGH' | 'MEDIUM' | 'LOW' {
+    const absChange = Math.abs(percentageChange);
+    if (absChange >= this.SIGNIFICANCE_THRESHOLDS.HIGH) return 'HIGH';
+    if (absChange >= this.SIGNIFICANCE_THRESHOLDS.MEDIUM) return 'MEDIUM';
     return 'LOW';
-  }
-
-  private static async getHistoricalStats(productId: string, competitorId: string): Promise<{
-    mean: number;
-    stdDev: number;
-  }> {
-    const prices = await prisma.priceHistory.findMany({
-      where: {
-        productId,
-        competitorId,
-      },
-      orderBy: {
-        timestamp: 'desc',
-      },
-      take: 30, // Last 30 data points
-    });
-
-    if (prices.length === 0) {
-      return { mean: 0, stdDev: 0 };
-    }
-
-    const values = prices.map(p => p.price);
-    const mean = values.reduce((a, b) => a + b, 0) / values.length;
-    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
-    const stdDev = Math.sqrt(variance);
-
-    return { mean, stdDev };
   }
 
   static async analyzePriceChange(
@@ -65,83 +31,55 @@ export class PriceAnalyzer {
     oldPrice: number,
     newPrice: number
   ): Promise<PriceAlert | null> {
-    try {
-      const percentageChange = ((newPrice - oldPrice) / oldPrice) * 100;
-      
-      // Get historical statistics
-      const { mean, stdDev } = await this.getHistoricalStats(productId, competitorId);
-      
-      // Calculate z-score of the price change
-      const zScore = this.calculateZScore(newPrice, mean, stdDev);
-      const significance = this.calculateSignificance(zScore);
+    const percentageChange = ((newPrice - oldPrice) / oldPrice) * 100;
+    const significance = this.calculateSignificance(percentageChange);
 
-      // Only create alert if the change is significant
-      if (significance === 'LOW' && Math.abs(percentageChange) < 5) {
-        return null;
-      }
-
-      // Get product and competitor details for context
-      const [product, competitor] = await Promise.all([
-        prisma.product.findUnique({ where: { id: productId } }),
-        prisma.competitor.findUnique({ where: { id: competitorId } })
-      ]);
-
-      const reason = this.generateAlertReason(
-        percentageChange,
-        significance,
-        mean,
-        newPrice,
-        product?.name || '',
-        competitor?.name || ''
-      );
-
-      const alert = await prisma.priceAlert.create({
-        data: {
-          productId,
-          competitorId,
-          oldPrice,
-          newPrice,
-          percentageChange,
-          significance,
-          reason,
-          timestamp: new Date(),
-        },
-      });
-
-      logger.info('Price alert created', {
-        alertId: alert.id,
-        productId,
-        competitorId,
-        significance,
-      });
-
-      return alert;
-    } catch (error) {
-      logger.error('Error analyzing price change:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        productId,
-        competitorId,
-      });
-      throw error;
+    // Only create alert if the change is significant enough
+    if (significance === 'LOW' && Math.abs(percentageChange) < 5) {
+      return null;
     }
+
+    const alert: PriceAlert = {
+      id: `alert_${Date.now()}`,
+      productId,
+      competitorId,
+      oldPrice,
+      newPrice,
+      percentageChange,
+      significance,
+      timestamp: new Date(),
+      reason: this.generateAlertReason(percentageChange, significance)
+    };
+
+    // Mock storing the alert
+    console.log('📊 Price Alert Generated:', {
+      alertId: alert.id,
+      change: `${oldPrice} → ${newPrice} (${percentageChange.toFixed(1)}%)`,
+      significance: alert.significance
+    });
+
+    return alert;
   }
 
   private static generateAlertReason(
     percentageChange: number,
-    significance: 'HIGH' | 'MEDIUM' | 'LOW',
-    historicalMean: number,
-    newPrice: number,
-    productName: string,
-    competitorName: string
+    significance: 'HIGH' | 'MEDIUM' | 'LOW'
   ): string {
     const direction = percentageChange > 0 ? 'increased' : 'decreased';
     const magnitude = Math.abs(percentageChange).toFixed(1);
-    const meanDiff = ((newPrice - historicalMean) / historicalMean * 100).toFixed(1);
 
-    let reason = `${competitorName} has ${direction} their price for ${productName} by ${magnitude}%. `;
-    reason += `This is ${significance.toLowerCase()} significance change. `;
-    reason += `The new price is ${meanDiff}% ${newPrice > historicalMean ? 'above' : 'below'} the historical average.`;
+    return `Price has ${direction} by ${magnitude}%. This is a ${significance.toLowerCase()} significance change that requires attention.`;
+  }
 
-    return reason;
+  static async analyzeMarketTrends(productIds: string[]): Promise<any[]> {
+    // Mock market analysis
+    console.log('📈 Market Trends Analysis for products:', productIds);
+    
+    return productIds.map(productId => ({
+      productId,
+      trend: Math.random() > 0.5 ? 'up' : 'down',
+      confidence: Math.random() * 100,
+      timestamp: new Date()
+    }));
   }
 } 

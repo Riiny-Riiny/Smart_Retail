@@ -5,7 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "lint": "next lint",
+    "generate-icons": "node scripts/generate-icons.js",
+    "pwa:build": "npm run generate-icons && npm run build",
+    "pwa:analyze": "npm run build && npx @next/bundle-analyzer",
+    "pwa:lighthouse": "lhci autorun"
   },
   "keywords": [],
   "author": "",
@@ -14,6 +19,7 @@
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@prisma/client": "^5.10.2",
+    "@tailwindcss/line-clamp": "^0.4.4",
     "@tanstack/react-query": "^5.77.0",
     "@tanstack/react-query-devtools": "^5.77.0",
     "@types/ws": "^8.18.1",
